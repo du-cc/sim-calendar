@@ -122,6 +122,53 @@
         background: color-mix(in srgb, var(--fg) 85%, var(--bg));
       }
 
+      .download-btn:disabled {
+        opacity: 0.6;
+        cursor: progress;
+      }
+
+      .spinner {
+        display: none;
+        width: 0.9em;
+        height: 0.9em;
+        margin-right: 0.5rem;
+        vertical-align: -0.1em;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+
+      .download-btn.loading .spinner {
+        display: inline-block;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .tutorial summary {
+        cursor: pointer;
+      }
+
+      .tutorial iframe {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        margin-top: 0.5rem;
+        border: 0;
+        border-radius: 6px;
+      }
+
+      .tutorial a {
+        display: block;
+        margin-top: 0.5rem;
+        text-align: right;
+        text-decoration: underline;
+      }
+
       .status {
         font-size: 0.85rem;
         transition: opacity 0.2s;
@@ -156,6 +203,23 @@
           <button id="save">Save</button>
         </div>
         <span class="status hide" id="status">Cookie isn't valid!</span>
+        <details class="tutorial">
+          <summary class="label">How to extract cookies (tutorial)</summary>
+          <iframe
+            src="https://www.youtube.com/embed/hIdTmgWu2f8"
+            title="How to extract cookies"
+            loading="lazy"
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+          ></iframe>
+          <a
+            class="label"
+            href="https://www.youtube.com/watch?v=hIdTmgWu2f8"
+            target="_blank"
+            rel="noopener"
+            >Open on YouTube</a
+          >
+        </details>
       </section>
 
       <section class="field">
@@ -170,10 +234,11 @@
 
       <div class="actions">
         <button class="download-btn primary" data-action="merged">
-          Merged download
+          <span class="spinner" aria-hidden="true"></span>Merged download
         </button>
         <button class="download-btn" data-action="split">
-          Split download (per module)
+          <span class="spinner" aria-hidden="true"></span>Split download (per
+          module)
         </button>
       </div>
     </main>
@@ -259,6 +324,7 @@
         showStatus(dateStatus, "");
 
         btn.disabled = true;
+        btn.classList.add("loading");
         try {
           const res = await fetch(
             `/api/timetable?${new URLSearchParams({ start, end, mode })}`,
@@ -296,6 +362,7 @@
           showStatus(dateStatus, err.message, "red");
         } finally {
           btn.disabled = false;
+          btn.classList.remove("loading");
         }
       });
     }

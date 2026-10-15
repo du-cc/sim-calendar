@@ -19,18 +19,34 @@ Extracts class schedule and convert them into calendar (.ics) file.
 
 ## Installation
 
-### Requires NodeJS
+### Requires [NodeJS](https://nodejs.org/en/download)
 
-Download via npm
+## Quick Start
+Linux/Windows/MacOS (with [git](https://git-scm.com/install/))
+```bash
+git clone https://github.com/du-cc/sim-calendar.git && cd sim-calendar && npm install https://github.com/du-cc/sim.git && npm start
+```
+Without git (Use **cmd** for windows, only tested in Linux)
+```bash
+curl -L -o sim-calendar.tar.gz https://github.com/du-cc/sim-calendar/archive/refs/heads/main.tar.gz && tar -xzf sim-calendar.tar.gz && cd sim-calendar-main && npm i https://github.com/du-cc/sim.git && npm start
+```
+## Manual
+1. Download this repo
+2. Install library via npm
 ```bash
 npm install https://github.com/du-cc/sim.git
 ```
+3. npm start
 
+## Tutorials
+### [How to extract cookies](https://www.youtube.com/watch?v=hIdTmgWu2f8)
 
 ## Development
 
 ### Libraries
+
 - [sim](https://github.com/du-cc/sim) - Outsystems API wrapper for MySIMApp
 
 ### AI
+
 - Code: [main.js](./main.js) - API endpoint design and implementation
