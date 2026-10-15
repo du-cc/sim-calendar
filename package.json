@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "start": "node main.js --open",
+    "dev": "node --watch main.js"
+  },
+  "dependencies": {
+    "sim": "github:du-cc/sim"
+  }
+}

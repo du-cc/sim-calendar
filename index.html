@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Timetable downloader</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --fg: #e6e6e6;
+        --bg: #0b0b0b;
+        --muted: color-mix(in srgb, var(--fg) 55%, transparent);
+        --line: color-mix(in srgb, var(--fg) 15%, transparent);
+        --date-picker-filter: 100%;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem 1rem;
+        font-family: "Inter", system-ui, sans-serif;
+        font-size: 15px;
+        background: var(--bg);
+        color: var(--fg);
+      }
+
+      main {
+        width: 100%;
+        max-width: 28rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+
+      .label {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+
+      .to {
+        color: var(--muted);
+      }
+
+      input,
+      button {
+        font: inherit;
+        color: inherit;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.6rem 0.75rem;
+        background: transparent;
+      }
+
+      input {
+        flex: 1;
+        min-width: 0;
+      }
+
+      input:focus,
+      button:focus-visible {
+        outline: none;
+        border-color: var(--muted);
+      }
+
+      input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(var(--date-picker-filter));
+      }
+
+      button {
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+
+      button:hover {
+        background: color-mix(in srgb, var(--fg) 8%, transparent);
+      }
+
+      button:active {
+        background: color-mix(in srgb, var(--fg) 14%, transparent);
+      }
+
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .download-btn.primary {
+        background: var(--fg);
+        color: var(--bg);
+        border-color: var(--fg);
+      }
+
+      .download-btn.primary:hover {
+        background: color-mix(in srgb, var(--fg) 85%, var(--bg));
+      }
+
+      .status {
+        font-size: 0.85rem;
+        transition: opacity 0.2s;
+      }
+
+      .status.red {
+        color: #f07178;
+      }
+
+      .status.green {
+        color: #7fd18b;
+      }
+
+      .status.hide {
+        opacity: 0 !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Timetable downloader</h1>
+
+      <section class="field">
+        <label class="label" for="cookie">Cookie</label>
+        <div class="row">
+          <input
+            type="text"
+            id="cookie"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="save">Save</button>
+        </div>
+        <span class="status hide" id="status">Cookie isn't valid!</span>
+      </section>
+
+      <section class="field">
+        <label class="label" for="date1">Range</label>
+        <div class="row">
+          <input type="date" id="date1" />
+          <span class="to">to</span>
+          <input type="date" id="date2" />
+        </div>
+        <span class="status hide" id="date_s">Invalid range!</span>
+      </section>
+
+      <div class="actions">
+        <button class="download-btn primary" data-action="merged">
+          Merged download
+        </button>
+        <button class="download-btn" data-action="split">
+          Split download (per module)
+        </button>
+      </div>
+    </main>
+  </body>
+  <script>
+    const cookieStatus = document.getElementById("status");
+    const dateStatus = document.getElementById("date_s");
+
+    function showStatus(el, text, kind = "hide", hideAfter) {
+      el.innerText = text;
+      el.className = `status ${kind}`;
+      if (hideAfter)
+        setTimeout(() => (el.className = "status hide"), hideAfter);
+    }
+
+    function downloadBlob(content, filename) {
+      const url = URL.createObjectURL(
+        new Blob([content], { type: "text/calendar;charset=utf-8" }),
+      );
+      const a = Object.assign(document.createElement("a"), {
+        href: url,
+        download: filename,
+      });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // show whether a cookie is stored, via the input's placeholder
+    const cookieInput = document.getElementById("cookie");
+
+    function setCookiePlaceholder(stored) {
+      cookieInput.placeholder = stored ? "Cookie saved" : "No cookie saved";
+    }
+
+    (async () => {
+      cookieInput.placeholder = "Checking...";
+      try {
+        const res = await fetch("/api/store");
+        if (!res.ok) throw new Error(res.status);
+        setCookiePlaceholder((await res.json()).stored);
+      } catch {
+        cookieInput.placeholder = "Couldn't check cookie status";
+      }
+    })();
+
+    // save cookie
+    document.getElementById("save").addEventListener("click", async () => {
+      let ok = false;
+      try {
+        const res = await fetch("/api/store", {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: document.getElementById("cookie").value,
+        });
+        ok = res.ok;
+      } catch {}
+      if (ok) setCookiePlaceholder(true);
+
+      showStatus(
+        cookieStatus,
+        ok ? "Cookie saved!" : "Failed to save cookie!",
+        ok ? "green" : "red",
+        2000,
+      );
+    });
+
+    // download timetable
+    for (const btn of document.getElementsByClassName("download-btn")) {
+      btn.addEventListener("click", async (e) => {
+        const mode = btn.dataset.action;
+
+        const start = document.getElementById("date1").value;
+        const end = document.getElementById("date2").value;
+        const startMs = Date.parse(start);
+        const endMs = Date.parse(end);
+
+        if (isNaN(startMs) || isNaN(endMs) || startMs > endMs) {
+          showStatus(dateStatus, "Invalid range!", "red");
+          return;
+        }
+        showStatus(dateStatus, "");
+
+        btn.disabled = true;
+        try {
+          const res = await fetch(
+            `/api/timetable?${new URLSearchParams({ start, end, mode })}`,
+          );
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(
+              err.error ||
+                `Request failed (${res.status})`,
+            );
+          }
+
+          if (mode === "merged") {
+            downloadBlob(
+              await res.text(),
+              `timetable_${start}_${end}.ics`,
+            );
+            return;
+          }
+
+          // split: { moduleName: .ics text }
+          const entries = Object.entries(await res.json());
+          if (!entries.length) {
+            showStatus(dateStatus, "No classes found in that range.", "red");
+            return;
+          }
+          for (const [title, ics] of entries) {
+            downloadBlob(
+              ics,
+              `${title.replace(/[^\w.-]+/g, "_")}.ics`,
+            );
+            await new Promise((r) => setTimeout(r, 300)); // avoid the browser blocking a burst of downloads
+          }
+        } catch (err) {
+          showStatus(dateStatus, err.message, "red");
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    }
+  </script>
+</html>
