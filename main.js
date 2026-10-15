@@ -6,7 +6,9 @@ const { getTimetable } = require("./timetable");
 
 const PORT = process.env.PORT || 3000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const STORE_PATH = path.join(__dirname, "store.b64");
+const DATA_DIR = path.join(__dirname, "data"); // gitignored, holds the stored cookie
+const PUBLIC_DIR = path.join(__dirname, "public"); // the only directory served to browsers
+const STORE_PATH = path.join(DATA_DIR, "store.b64");
 const MAX_BODY = 16 * 1024;
 
 // CORS: only this app's own origins by default. Add more with
@@ -136,6 +138,7 @@ async function handleStore(req, res) {
   if (!value) return sendJson(res, 400, { error: "body must be non-empty text" });
 
   try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
     await fs.writeFile(STORE_PATH, Buffer.from(value, "utf8").toString("base64"), {
       mode: 0o600,
     });
@@ -158,20 +161,39 @@ async function handleStoreStatus(res) {
   }
 }
 
-// Only these files are served statically (never main.js, store.b64, etc.)
-const STATIC_FILES = {
-  "/": ["index.html", "text/html; charset=utf-8"],
-  "/index.html": ["index.html", "text/html; charset=utf-8"],
-  "/index.js": ["index.js", "text/javascript; charset=utf-8"],
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".png": "image/png",
 };
 
-async function handleStatic(entry, req, res) {
-  const [file, type] = entry;
+// Serve a file from PUBLIC_DIR (GET/HEAD only); anything outside it is a 404.
+async function handleStatic(url, req, res) {
+  let pathname;
   try {
-    const content = await fs.readFile(path.join(__dirname, file));
+    pathname = decodeURIComponent(url.pathname);
+  } catch {
+    return sendJson(res, 400, { error: "bad path" });
+  }
+  if (pathname === "/") pathname = "/index.html";
+
+  const file = path.join(PUBLIC_DIR, pathname);
+  const type = MIME_TYPES[path.extname(file).toLowerCase()];
+  if (pathname.includes("\0") || !file.startsWith(PUBLIC_DIR + path.sep) || !type) {
+    return sendJson(res, 404, { error: "not found" });
+  }
+
+  try {
+    const content = await fs.readFile(file);
     res.writeHead(200, { "Content-Type": type });
     res.end(req.method === "HEAD" ? undefined : content);
   } catch (err) {
+    if (err.code === "ENOENT" || err.code === "EISDIR") {
+      return sendJson(res, 404, { error: "not found" });
+    }
     console.error(err);
     sendJson(res, 500, { error: "Failed to read file" });
   }
@@ -182,11 +204,6 @@ const server = http.createServer((req, res) => {
 
   const url = new URL(req.url, "http://localhost");
   if (url.pathname.startsWith("/api/")) url.pathname = url.pathname.slice(4);
-
-  const staticEntry = Object.hasOwn(STATIC_FILES, url.pathname) && STATIC_FILES[url.pathname];
-  if (staticEntry && (req.method === "GET" || req.method === "HEAD")) {
-    return handleStatic(staticEntry, req, res);
-  }
 
   if (url.pathname === "/timetable") {
     if (req.method !== "GET") {
@@ -202,6 +219,8 @@ const server = http.createServer((req, res) => {
     res.setHeader("Allow", "GET, POST");
     return sendJson(res, 405, { error: "method not allowed" });
   }
+
+  if (req.method === "GET" || req.method === "HEAD") return handleStatic(url, req, res);
 
   sendJson(res, 404, { error: "not found" });
 });

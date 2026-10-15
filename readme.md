@@ -4,7 +4,7 @@ Extracts class schedule and convert them into calendar (.ics) file.
 
 > [!CAUTION]
 >
-> **DO NOT** send **store.b64** file
+> **DO NOT** send **data/store.b64** file
 >
 > It contains credentials that are able to bypass **2FA / MFA (Two / Multi Factor Authentication)**
 
